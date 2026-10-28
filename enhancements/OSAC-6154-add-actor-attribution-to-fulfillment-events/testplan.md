@@ -380,7 +380,8 @@ actor semantics are documented without changing the public Event contract.
 
 - **Tier / owner:** Component integration (database) / [DEV] OSAC-Core.
 - **Suite:** Proposed `fulfillment-service/internal/database/migrations/136_add_actor_to_changes_test.go`;
-  136 is the next migration number at this checkout.
+  136 is the next migration number at this checkout; verify the next free number
+  before implementation.
 - **Command / working directory:** From `fulfillment-service/`, the documented
   `ginkgo run -r internal` command.
 - **Real / faked:** A real PostgreSQL test container runs the migration and
@@ -443,8 +444,8 @@ actor semantics are documented without changing the public Event contract.
 1. Exercise automatic ExternalIP creation from ComputeInstance, Cluster, and
    BareMetalInstance write paths.
 2. Exercise ExternalIPPool capacity updates, ExternalIP/ExternalIPAttachment
-   lifecycle mutations, Tenant secret cleanup, and ClusterVersion default-swap
-   updates.
+   and NATGateway lifecycle mutations, Tenant secret cleanup, and ClusterVersion
+   default-swap updates.
 3. Query the transaction-created `changes` rows for each operation.
 
 ##### Expected Results
