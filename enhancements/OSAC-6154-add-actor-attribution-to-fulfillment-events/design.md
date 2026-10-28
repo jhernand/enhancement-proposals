@@ -3,7 +3,7 @@ title: actor-attribution-fulfillment-events
 authors:
   - juan.hernandez@redhat.com
 creation-date: 2026-10-27
-last-updated: 2026-10-27
+last-updated: 2026-10-28
 tracking-link:
   - "https://redhat.atlassian.net/browse/OSAC-6856"
 prd:
@@ -44,8 +44,9 @@ reliably identify the caller or distinguish service accounts. [Codebase:
 - Carry typed actor identity from object-changing requests to private Events and
   Kafka while keeping the existing event identifier, ordering, and retry
   behavior. [PRD: §In Scope, bullets 1–3]
-- Distinguish user, service-account, and system actors; system actors have no
-  name and reveal no system-component detail. [User]
+- Identify the acting user or service account with a reference scoped by name,
+  project, and tenant. Preserve system-tenant scope in the private actor
+  reference. [User]
 - Populate the request's actor identity during authentication/authorization and
   let a context callback derive the event actor without auth-specific DAO logic.
   [User]
@@ -75,30 +76,31 @@ public Event projection remains unchanged. [PRD: §In Scope, bullets 1–3] [Use
 
 The sequence shows the Fulfillment path for an object change. Authentication
 and authorization attach an `auth.Subject` to the request context before the
-handler runs; the DAO callback reads that subject to determine the actor. A
-Tenant User, Tenant Admin, Cloud Provider Admin, or internal service account
-can initiate an object change. The Cloud Provider Admin can receive the
-resulting actor-bearing Event through the private Events Watch API. [PRD:
-§In Scope, bullets 1–2, 4] [User]
+handler runs; the DAO callback turns it into a scoped user or service-account
+reference. Tenant Users, Tenant Admins, Cloud Provider Admins, and internal
+service accounts can initiate changes. A Cloud Provider Admin receives the
+resulting Event through private Events Watch. [PRD: §In Scope, bullets 1–2, 4]
+[User]
 
 ```mermaid
 sequenceDiagram
-    actor Writer as Tenant User, Tenant Admin, Cloud Provider Admin, or service account
+    actor Writer as Caller
     participant RPC as Fulfillment gRPC server
+    participant Auth as Authentication and authorization
     participant DAO as Generic DAO
-    database PG as PostgreSQL
+    participant PG as PostgreSQL database
     participant Trigger as enqueue_change trigger
     participant Publisher as EventPublisher
-    queue Kafka
+    participant Kafka as Kafka broker
     participant Watch as Private Events Watch
     actor Admin as Cloud Provider Admin
 
     Admin->>Watch: Subscribe to private Events
     Writer->>RPC: Submit an object-change request
-    RPC->>RPC: Authenticate and authorize
-    RPC->>RPC: Attach auth.Subject to request context
+    RPC->>Auth: Authenticate and authorize
+    Auth-->>RPC: Attach auth.Subject with home tenant and project
     RPC->>DAO: Run mutation with request context
-    DAO->>DAO: AddLocalVariable reads auth.Subject
+    DAO->>DAO: AddLocalVariable builds user or service-account reference
     DAO->>PG: Set transaction-local osac.actor
     DAO->>PG: Insert, update, or delete object
     PG->>Trigger: Run after-row trigger
@@ -127,9 +129,9 @@ bullet 3]
 
 | ID | Extension | Change | PRD trace |
 |---|---|---|---|
-| IC-1 | Private Event protobuf | Add `Event.actor` and `EventActor`; both remain private in generated APIs. | §In Scope, bullets 1–3 |
+| IC-1 | Private Event protobuf | Add private `Event.actor` with a `subject` oneof reusing shared `UserReference` and `ServiceAccountReference` types. | §In Scope, bullets 1–3 |
 | IC-2 | Private Events Watch and Kafka | Existing Event surfaces carry the actor; no new RPC or topic is added. | §In Scope, bullets 1 and 4 |
-| IC-3 | Auth subject context | Add `auth.Subject.Tenant`, populated during authentication/authorization and available in request context. | §In Scope, bullets 2–3 |
+| IC-3 | Auth subject context | Add tenant and principal-project scope to `auth.Subject`, populated during authentication/authorization and available in request context. | §In Scope, bullets 2–3 |
 | IC-4 | Generic DAO builder | Add internal `AddLocalVariable` configuration for transaction-local values. | §In Scope, bullets 2–3 |
 | IC-5 | Changes outbox | Add nullable JSONB actor column and copy the local value in the trigger. | §In Scope, bullets 2–3 |
 | IC-6 | EventPublisher | Read and decode the outbox actor into the private Event before Kafka publication. | §In Scope, bullets 1–3 |
@@ -140,36 +142,39 @@ that projection. [Codebase: `fulfillment-service/docs/API.md`,
 `fulfillment-service/internal/servers/events_server.go`]
 
 The private Watch CEL environment is built from the private Event descriptor, so
-private consumers can filter on `actor.type` and `actor.name`. Existing private
-API authorization and visibility rules continue to govern access. [User]
-[Codebase: `fulfillment-service/internal/servers/private_events_server.go`]
+private consumers can filter on fields of the selected actor reference, such as
+`actor.user.name` and `actor.service_account.tenant`. Existing private API
+authorization and visibility rules continue to govern access. [User] [Codebase:
+`fulfillment-service/internal/servers/private_events_server.go`]
 
 ### Implementation Details/Notes/Constraints
 
 #### Private protobuf contract
 
-Add the actor type and field to
-`proto/private/osac/private/v1/event_type.proto`. The current Event uses field
+Add the actor wrapper and field to
+`proto/private/osac/private/v1/event_type.proto`, importing the shared reference
+type definitions. The current Event uses field
 numbers through 38, so 39 is the next available number at this checkout; verify
 it again before implementation. Private-only fields belong at the end of the
-message. [Codebase: `proto/private/osac/private/v1/event_type.proto`,
-`fulfillment-service/docs/API.md`]
+message. Reuse shared reference types; do not define actor-only reference
+messages. `UserReference` currently has `shared` instead of `tenant`; its
+tenant-scope prerequisite is [OSAC-5424](https://redhat.atlassian.net/browse/OSAC-5424).
+The service-account reference type is not present in the current proto source;
+reuse the canonical type from the service-account RoleBinding contract tracked
+by [OSAC-6554](https://redhat.atlassian.net/browse/OSAC-6554) when that contract
+is available. This Feature depends on both reference contracts exposing
+`name`, `project`, and `tenant`, and does not introduce replacements. [Codebase:
+`proto/private/osac/private/v1/event_type.proto`,
+`proto/private/osac/private/v1/user_type.proto`, `proto/AGENTS.md`]
 
 ```protobuf
-enum EventActorType {
-  option (cleanapi.enum).private = true;
-
-  EVENT_ACTOR_TYPE_UNSPECIFIED = 0;
-  EVENT_ACTOR_TYPE_USER = 1;
-  EVENT_ACTOR_TYPE_SYSTEM = 2;
-  EVENT_ACTOR_TYPE_SERVICE_ACCOUNT = 3;
-}
-
 message EventActor {
   option (cleanapi.message).private = true;
 
-  EventActorType type = 1;
-  optional string name = 2;
+  oneof subject {
+    UserReference user = 1;
+    ServiceAccountReference service_account = 2;
+  }
 }
 
 message Event {
@@ -178,53 +183,66 @@ message Event {
 }
 ```
 
-`name` is present for user and service-account actors and absent for a system
-actor. `Event.actor` itself is absent when identity is genuinely unavailable.
-The unspecified enum value is a protobuf default and must not be emitted as a
-valid actor. [User] [PRD: §In Scope, bullets 2–3]
+The `subject` oneof identifies whether the principal is a user or service
+account; the shared references scope the principal by name, home project, and
+tenant. A user acting in tenant `system` remains a `UserReference` with that
+tenant. A system service account uses `ServiceAccountReference` with
+`tenant=system`. The reference types and their tenant fields are owned by the
+shared API/reference work above. The implementation selects the
+service-account name's short or full form. `Event.actor` is absent only when
+actor identity is genuinely unavailable. [User] [PRD: §In Scope, bullets 2–3]
 
-Marking the actor message, enum, and Event field private keeps them out of
-generated public protos. Regenerate `proto/public/` and `proto/gen/` from
+This implementation depends on the shared reference contracts landing first;
+if either shared type lacks the required tenant/project scope, resolve that in
+its owning reference work rather than defining a duplicate type here.
+
+Marking the actor message and Event field private keeps the actor oneof out of
+the generated public Event. Regenerate `proto/public/` and `proto/gen/` from
 `proto/private/`; do not hand-edit generated output. [Codebase: `proto/AGENTS.md`,
 `fulfillment-service/docs/CLEANAPI.md`]
 
 #### Actor resolution and DAO local variables
 
-Add `Tenant string` to `auth.Subject` and populate it during the existing
-authentication/authorization phase before the handler runs. `Subject.Tenant`
-identifies the tenant the subject belongs to; the existing `Subject.Tenants`
-set continues to represent the tenants the subject can see. The subject is
-already stored in request context, so the DAO callback reads it with
-`auth.SubjectFromContext` and does not need an auth-specific DAO interface.
-[User] [Codebase: `fulfillment-service/internal/auth/auth_subject.go`]
+Add `Tenant` and `Project` fields to `auth.Subject` and populate them during
+authentication/authorization before the handler runs. `Subject.Tenant` is the
+tenant the subject belongs to; the existing `Subject.Tenants` set remains the
+set of tenants the subject can see. `Subject.Project` is the principal's home
+project, not the target object's project. It is empty for a principal without a
+home project. The subject is already stored in request context, so the DAO
+callback reads it with `auth.SubjectFromContext`. [User] [Codebase:
+`fulfillment-service/internal/auth/auth_subject.go`]
 
 `auth.Subject` has custom JSON serialization. Extend its internal JSON shape to
-include `Tenant` and preserve it through marshal/unmarshal; older serialized
-subjects without that property decode with an empty `Tenant`.
+include `Tenant` and `Project` and preserve them through marshal/unmarshal;
+older serialized subjects without those properties decode with empty fields.
 
-The actor callback maps that context as follows:
+The actor callback maps the authentication method to the oneof variant and
+copies the principal's home scope into the reference:
 
-| Request context | EventActor |
+| Request context | `EventActor.subject` |
 |---|---|
-| `Subject.Tenant == auth.SystemTenant` | `SYSTEM`, with `name` absent |
-| JWT authentication with a named subject | `USER`, with the user's name |
-| Service-account authentication with a named subject | `SERVICE_ACCOUNT`, with the service-account name |
+| JWT authentication with a named subject | `user` reference with `name`, home `project`, and `tenant` |
+| Service-account authentication with a named subject | `service_account` reference with `name`, home `project`, and `tenant` |
 | Guest/anonymous authentication with no actor identity | No `Event.actor` |
 | Identity is present but cannot be classified | Return an error; do not silently omit an available identity |
 
-The system-tenant check takes precedence over authentication method. The
-callback does not infer actor type from object `creator` or from the subject's
-visibility set. Existing `SystemAttributionLogic` remains unrelated: it sets
-object `creator` to `system` for private writes. [User] [Codebase:
+The principal kind is determined by authentication method, not by tenant.
+Therefore a user acting in the system tenant is a `user` reference with
+`tenant=system`; an internal system service account is a `service_account`
+reference with `tenant=system`. The scoped tuple distinguishes same-name
+principals across projects and tenants. The callback does not infer principal
+kind from object `creator` or from the subject's visibility set. Existing
+`SystemAttributionLogic` remains unrelated: it sets object `creator` to
+`system` for private writes. [User] [Codebase:
 `fulfillment-service/internal/auth/auth_context.go`,
 `fulfillment-service/internal/auth/auth_subject.go`,
 `fulfillment-service/internal/auth/system_attribution_logic.go`]
 
-For USER, the actor name comes from `auth.Subject.User`. For SERVICE_ACCOUNT,
-the callback uses the authenticated service-account identity; the implementation
-selects whether its event name uses the short account name or complete subject.
-This formatting choice does not change the actor type or private Event contract.
-[Codebase: `fulfillment-service/internal/auth/auth_context_extraction.go`]
+The reference `name`, `project`, and `tenant` come from the authenticated
+principal context. For service accounts, the implementation selects whether
+`name` uses the short account name or complete subject. This formatting choice
+does not change the scoped-reference contract. [Codebase:
+`fulfillment-service/internal/auth/auth_context_extraction.go`]
 
 Add a callback type to the generic DAO configuration, for example:
 
@@ -292,9 +310,11 @@ supporting DAO builder; read-only supporting DAOs do not need actor configuratio
 Add a new numbered migration after the current latest migration; do not modify
 migrations 117 or 118. Add nullable `actor JSONB` to `changes` and update
 `enqueue_change()` to copy the transaction-local actor value into the new
-column. A missing or empty setting becomes SQL `NULL`; a system actor is a JSON
-object with `type=SYSTEM` and no `name`. Existing outbox rows remain `NULL` and
-are published without an actor; no historical actor backfill is proposed.
+column. A missing or empty setting becomes SQL `NULL`; otherwise it stores
+protojson for the selected user or service-account reference. System-tenant
+principals carry `tenant=system` in their reference. Existing outbox rows remain
+`NULL` and are published without an actor; no historical actor backfill is
+proposed.
 [User] [Codebase:
 `fulfillment-service/internal/database/migrations/117_add_changes.up.sql`,
 `fulfillment-service/internal/database/migrations/118_move_watches_to_kafka.up.sql`]
@@ -322,8 +342,8 @@ filters out the private actor field. [Codebase:
 `fulfillment-service/internal/servers/events_server.go`]
 
 Update `fulfillment-service/docs/API.md`'s Events section to document the
-private actor types, name-presence rules, and absent-identity behavior. The
-public Event documentation and generated public schema remain unchanged.
+private actor oneof and its reference scope. The public Event
+documentation and generated public schema remain unchanged.
 
 ### Security Considerations
 
@@ -333,10 +353,13 @@ public Event documentation and generated public schema remain unchanged.
 - The actor field and `EventActor` type remain private. The public Events server
   continues to expose the generated public Event, which has no actor field.
   [User] [Codebase: `fulfillment-service/docs/API.md`]
-- `SYSTEM` actors have no name, so events do not disclose which system component
-  performed an action. Do not log actor values. [User]
-- Actor names are identity data. Existing private API authorization and Kafka
-  access controls continue to govern their visibility; no new role is proposed.
+- Private actor references can contain system-tenant principal details. Do not
+  log raw actor references. If a later Feature exposes actors publicly, its
+  public projection must explicitly omit system-tenant references and their
+  identifying fields. [User]
+- Principal names and scope are identity data. Existing private API
+  authorization and Kafka access controls continue to govern their visibility;
+  no new role is proposed.
 
 ### Failure Handling and Recovery
 
@@ -348,7 +371,8 @@ public Event documentation and generated public schema remain unchanged.
 - If PostgreSQL cannot cast the actor value to JSONB, the trigger fails and the
   object transaction rolls back.
 - If a legacy outbox row has a null actor, EventPublisher emits the Event with
-  `actor` absent.
+  `actor` absent. A system-tenant user remains a user reference; a system-tenant
+  service account remains a service-account reference, each with `tenant=system`.
 - If EventPublisher cannot decode a non-null actor JSON value, the existing
   conversion-error path logs the failure, increments
   `event_publish_errors_total`, and deletes the row so the drain can continue.
@@ -372,11 +396,12 @@ value. [Codebase: `fulfillment-service/internal/servers/event_publisher.go`]
 
 ### Risks and Mitigations
 
-1. **Incorrect actor classification.** User, service-account, and system
-   identities can be confused if classification uses object `creator` or the
-   subject's visibility set. Mitigation: classify `SYSTEM` from
-   `auth.Subject.Tenant == auth.SystemTenant`; classify other identified
-   subjects by authentication method; test each category. Owner: OSAC-Core.
+1. **Incorrect actor identity or scope.** User and service-account principals
+   can be confused or collide if classification uses object `creator` or omits
+   project/tenant scope. Mitigation: select the oneof variant from the
+   authentication method and build the reference from the authenticated
+   principal's name, home project, and tenant; test both variants and
+   system-tenant scope. Owner: OSAC-Core.
 2. **Missed write path.** A direct DAO or SQL object write may not configure
    `osac.actor`. Mitigation: configure the generic and specialized write DAO
    builders listed in Implementation Details, and test their outbox rows in
@@ -388,9 +413,11 @@ value. [Codebase: `fulfillment-service/internal/servers/event_publisher.go`]
    row on permanent conversion errors. Mitigation: serialize in the request
    transaction, keep the existing drop-and-count behavior for malformed stored
    JSON, and cover it in TC-PRDIS1-05.
-5. **Identity exposure.** Actor names may reveal personal or service-account
-   information. Mitigation: keep the field private, omit system names, and do
-   not log actor values. Owner: OSAC-Core.
+5. **Identity exposure.** Scoped references contain user or service-account
+   names and may include system-tenant identity details. Mitigation: keep actor
+   references private, do not log them, and require a public projection to
+   explicitly remove system-tenant references before any future exposure.
+   Owner: OSAC-Core.
 
 ### Drawbacks
 
@@ -399,9 +426,10 @@ value. [Codebase: `fulfillment-service/internal/servers/event_publisher.go`]
 - Actor data is encoded at the request boundary, stored in PostgreSQL JSONB,
   decoded by a separate process, and serialized again in the Event. This adds
   processing and another persisted column.
-- The initial user identity is a name, not a separate stable identifier; names
-  may change over time. This follows the PRD's current requirement.
-- Omitting a system-component name reduces diagnostic detail by design.
+- Scoped principal references are more verbose than a type/name pair and can
+  change when a principal's home project or tenant changes.
+- Private system-tenant references can include service-account identity details;
+  a future public actor contract would need an explicit redaction policy.
 
 ## Alternatives (Not Implemented)
 
@@ -442,14 +470,14 @@ value. [Codebase: `fulfillment-service/internal/servers/event_publisher.go`]
   setting name or value. [Codebase:
   `fulfillment-service/internal/database/dao/generic_dao_signal.go`]
 
-### Include a stable user ID instead of a name
+### Include only an opaque identifier instead of a scoped reference
 
-- **Pros:** A stable identifier can remain the same if the user's name changes.
-- **Cons:** It requires a separate identity-resolution contract and adds data
-  beyond the PRD's user-name requirement.
-- **Reason not selected:** The initial EventActor contract uses the user's name;
-  other identity fields can be considered separately if a later requirement
-  needs them. [PRD: §In Scope, bullet 2] [User]
+- **Pros:** Opaque IDs remain stable if a principal's name changes.
+- **Cons:** Consumers need another identity lookup to interpret the actor, and
+  the reference does not carry project/tenant scope.
+- **Reason not selected:** The shared reference contracts carry name, project,
+  and tenant so same-name principals in different scopes remain distinct.
+  [User]
 
 ### Store actor inside the changed object JSON
 
@@ -476,9 +504,10 @@ Kafka publication, and the private Watch stream.
 
 ### Unit Tests
 
-- Actor resolution maps JWT subjects to `USER`, service-account subjects to
-  `SERVICE_ACCOUNT`, subjects with `Tenant == auth.SystemTenant` to `SYSTEM`
-  without a name, and genuinely unavailable identity to no Event actor.
+- Actor resolution maps authenticated users and service accounts to their
+  respective shared reference variants, preserves system-tenant scope in either
+  variant, and leaves the actor absent only when identity is genuinely
+  unavailable.
 - `AddLocalVariable` encodes supported scalars and protobuf messages, rejects
   unsupported values, and propagates callback/encoding errors before object DML.
 
@@ -503,9 +532,9 @@ private Watch stream.
 The target is **Dev Preview (0.5)**. The Dev Preview exit criteria are:
 
 - All 12 planned unit and component-integration test cases pass.
-- User, service-account, and system actors are attributed across the covered
-  generic and specialized write paths; actor is absent only when identity is
-  genuinely unavailable.
+- User and service-account references are attributed across the covered generic
+  and specialized write paths, including system-tenant principals; actor is
+  absent only when identity is genuinely unavailable.
 - The actor survives the PostgreSQL outbox, EventPublisher, Kafka, and private
   Watch path, while generated public Events remain actor-free.
 - Proto generation and lint pass, and `fulfillment-service/docs/API.md`
@@ -547,8 +576,9 @@ Tech Preview and GA graduation criteria are outside this release's target.
 - If actor values are missing unexpectedly, verify that the migration
   completed, the actor callback is configured on the writing DAO, and the
   EventPublisher uses the schema-compatible version.
-- Do not log raw actor JSON or system-component names. The design intentionally
-  omits a name for `SYSTEM` actors.
+- Do not log raw actor reference JSON or principal names. The design keeps actor
+  references private; any future public exposure must remove system-tenant
+  references and their identifying details.
 - No runtime feature flag is proposed. Rolling back to an older application
   version leaves the additive database column in place and resumes existing
   event publication without actor attribution.
@@ -563,7 +593,7 @@ existing PostgreSQL and Kafka test containers.
 
 ## Provenance
 
-Authored: revise @ design 0.12.0 - 7b2b8de, workspace feat/osac-6637-reader-role-access-docs @ 700534eab
-Phases: draft, revise, revise, revise, revise, revise, revise
+Authored: respond @ design 0.12.0 - 7b2b8de, workspace feat/osac-6637-reader-role-access-docs @ 700534eab
+Phases: draft, revise, revise, revise, revise, revise, revise, respond
 
-<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"design","workflow_version":"0.12.0","ai_workflows":"7b2b8de","source_repo":"700534eab","source_repo_branch":"feat/osac-6637-reader-role-access-docs","commits_behind_main":0,"commits_ahead_main":1,"main_ref":"main","phases":["draft","revise","revise","revise","revise","revise","revise"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
+<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"design","workflow_version":"0.12.0","ai_workflows":"7b2b8de","source_repo":"700534eab","source_repo_branch":"feat/osac-6637-reader-role-access-docs","commits_behind_main":0,"commits_ahead_main":1,"main_ref":"main","phases":["draft","revise","revise","revise","revise","revise","revise","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->

@@ -25,16 +25,23 @@ traceability labels for this testplan, not new PRD requirement IDs.
 | PRD / IC | Behavior and required boundary | Tier / owner | Case | Suite, command, and real/faked dependencies |
 |---|---|---|---|---|
 | PRD-IS1, IC-1 | Private Event actor contract and public projection privacy. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-01 | Existing `fulfillment-service/internal/servers/events_server_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. Kafka test container and in-process gRPC `bufconn` are real; database, Keycloak, and deployed service are omitted. Proto generation/lint are separate static validation. |
-| PRD-IS1, PRD-IS4, IC-5, IC-6 | Outbox actor is decoded into the private protobuf Event and published to Kafka. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-02 | Existing `fulfillment-service/internal/servers/event_publisher_test.go`; same command. PostgreSQL test instance and Kafka test container are real; the outbox row is seeded by the test. |
+| PRD-IS1, PRD-IS4, IC-5, IC-6 | Scoped outbox actor reference is decoded into the private protobuf Event and published to Kafka. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-02 | Existing `fulfillment-service/internal/servers/event_publisher_test.go`; same command. PostgreSQL test instance and Kafka test container are real; the outbox row is seeded by the test. |
 | PRD-IS1, PRD-IS4, IC-2 | Private Events Watch streams the actor from Kafka to an internal client. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-03 | Existing `fulfillment-service/internal/servers/private_events_server_test.go`; same command. Kafka test container and in-process gRPC `bufconn` are real; database and live authentication are omitted. |
-| PRD-IS1, IC-1, IC-2 | Private Watch CEL filters can select Events by `actor.type` and `actor.name`. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-04 | Existing `fulfillment-service/internal/servers/private_events_server_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. Kafka test container and in-process gRPC are real; database and live authentication are omitted. |
+| PRD-IS1, IC-1, IC-2 | Private Watch CEL filters can select Events by user and service-account reference fields. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-04 | Existing `fulfillment-service/internal/servers/private_events_server_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. Kafka test container and in-process gRPC are real; database and live authentication are omitted. |
 | PRD-IS1, IC-5, IC-6 | Malformed non-null actor JSON follows the publisher's permanent-conversion-error policy. | Component integration / [DEV] OSAC-Core | TC-PRDIS1-05 | Existing `fulfillment-service/internal/servers/event_publisher_test.go`; same command. PostgreSQL and Kafka test containers are real; the malformed outbox row is seeded by the test. |
-| PRD-IS2, IC-3 | `auth.Subject.Tenant` survives custom JSON serialization and is attached to request context, separate from the visible-tenant set. | Unit / [DEV] OSAC-Core | TC-PRDIS2-01 | Existing `fulfillment-service/internal/auth/auth_subject_test.go` and `grpc_authz_interceptor_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Auth subjects, tokens, and policy results are fixtures; no Keycloak, PostgreSQL, or Kafka. |
-| PRD-IS2, IC-3 | Actor callback maps `Subject.Tenant == system` to SYSTEM, otherwise uses authentication method to distinguish USER and SERVICE_ACCOUNT, and omits identity only when unavailable. | Unit / [DEV] OSAC-Core | TC-PRDIS2-02 | Proposed `fulfillment-service/internal/cmd/service/start/grpcserver/actor_context_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Contexts are fixtures; no Keycloak, PostgreSQL, or Kafka. The test asserts the service-account name selected by implementation. |
+| PRD-IS2, IC-3 | `auth.Subject.Tenant` and `Project` survive custom JSON serialization and are attached to request context, separate from the visible-tenant set. | Unit / [DEV] OSAC-Core | TC-PRDIS2-01 | Existing `fulfillment-service/internal/auth/auth_subject_test.go` and `grpc_authz_interceptor_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Auth subjects, tokens, and policy results are fixtures; no Keycloak, PostgreSQL, or Kafka. |
+| PRD-IS2, IC-1, IC-3 | Actor callback builds a user or service-account reference from authentication method and home scope; system tenant is a scope value, not a separate principal type. | Unit / [DEV] OSAC-Core | TC-PRDIS2-02 | Proposed `fulfillment-service/internal/cmd/service/start/grpcserver/actor_context_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Contexts are fixtures; no Keycloak, PostgreSQL, or Kafka. |
 | PRD-IS2, IC-4 | Local-variable callback encodes values and returns errors before DML. | Unit / [DEV] OSAC-Core | TC-PRDIS2-03 | Proposed `fulfillment-service/internal/database/dao/generic_dao_local_variable_test.go`; `ginkgo run -r internal`. A transaction test double is used; no external services run for the case. |
 | PRD-IS2, PRD-IS3, IC-5 | Trigger persists actor JSONB, leaves it null when absent, and does not leak a local value across transactions. | Component integration (database) / [DEV] OSAC-Core | TC-PRDIS2-04, TC-PRDIS3-01 | Proposed `fulfillment-service/internal/database/migrations/136_add_actor_to_changes_test.go` (136 is the next migration number at this checkout); `ginkgo run -r internal` from `fulfillment-service/`. A real PostgreSQL test container runs; Kafka and Keycloak are omitted. |
 | PRD-IS1, PRD-IS2, IC-3–IC-6 | Actor from a DAO mutation reaches the Kafka Event through the trigger and publisher. | Component integration / [DEV] OSAC-Core | TC-PRDIS2-05 | Proposed extension to `fulfillment-service/internal/servers/event_publisher_test.go`; `ginkgo run --timeout 10m internal/servers`. PostgreSQL and Kafka test containers are real; the auth subject is a fixture, not a live Keycloak request. |
 | PRD-IS1, PRD-IS2, IC-4–IC-6 | Specialized server/helper DAO write paths persist the request actor in their outbox rows. | Component integration / [DEV] OSAC-Core | TC-PRDIS2-06 | Proposed `fulfillment-service/internal/servers/event_actor_write_paths_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. PostgreSQL testcontainer is real; auth subject is fixture data, and Kafka is not needed to inspect the outbox. |
+
+The plan depends on the shared reference contracts providing `tenant` scope:
+[OSAC-5424](https://redhat.atlassian.net/browse/OSAC-5424) for full references
+such as `UserReference`, and the service-account/RoleBinding reference work in
+[OSAC-6554](https://redhat.atlassian.net/browse/OSAC-6554). This Feature does not
+add actor-only reference messages. Confirm both shared types carry `name`,
+`project`, and `tenant` before implementing the EventActor oneof.
 
 Run from the repository root after the proto change:
 
@@ -97,15 +104,21 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Use table-driven change rows for each registered object payload and valid
-   actor JSON for USER, SERVICE_ACCOUNT, and SYSTEM.
+1. Use table-driven change rows for each registered object payload and actor
+   JSON containing the shared user or service-account reference in ordinary and
+   system tenant/project scopes.
 2. Include create, update, delete, and signal operations where applicable.
-3. Run EventPublisher, consume the Kafka Events, and inspect actor type and name.
+3. Run EventPublisher, consume the Kafka Events, and inspect the selected
+   reference and its scope.
 
 ##### Expected Results
 
-- User and service-account Events contain the expected actor type and name.
-- The system Event has type SYSTEM and no name.
+- User Events select `actor.user`; service-account Events select
+  `actor.service_account`.
+- Both references preserve the expected name, project, and tenant values from
+  the shared reference contract.
+- A user in the system tenant remains a user reference; a system service
+  account remains a service-account reference with tenant `system`.
 - Every supported object payload carries the same actor metadata; Event ID,
   object payload, EventType, topic, key, and ordering are unchanged.
 
@@ -137,8 +150,8 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Expected Results
 
-- The private Watch response contains the same actor type and name as the
-  published Event.
+- The private Watch response contains the same reference variant and scoped
+  principal fields as the published Event.
 - The Event ID and object payload are unchanged.
 
 ##### Evidence
@@ -164,13 +177,15 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Start a Watch with filter `event.actor.type == EVENT_ACTOR_TYPE_USER` and
-   publish matching and nonmatching Events.
-2. Repeat with filter `event.actor.name == "alice"` and distinct actor names.
+1. Start a Watch with filter `event.actor.user.name == "alice"` and publish
+   matching and nonmatching user-reference Events.
+2. Repeat with filter
+   `event.actor.service_account.tenant == "system"` and service-account
+   references in system and ordinary tenants.
 
 ##### Expected Results
 
-- Each filter compiles and returns only Events whose actor field matches.
+- Each filter compiles and returns only Events whose selected reference matches.
 - Events without an actor do not match either actor-field filter.
 
 ##### Evidence
@@ -196,7 +211,7 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Seed a change row whose `actor` JSONB is syntactically valid JSON but cannot
+1. Seed a change row whose `actor` JSONB sets both oneof references and cannot
    be decoded as `EventActor`, followed by a valid change row.
 2. Run EventPublisher and inspect Kafka, the outbox, and the error metric.
 
@@ -231,19 +246,20 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Marshal and unmarshal subjects with a populated `Tenant` and `Tenants` set;
-   also unmarshal a legacy subject JSON value without `Tenant`.
+1. Marshal and unmarshal subjects with populated `Tenant`, `Project`, and
+   `Tenants` fields; also unmarshal a legacy subject JSON value without the new
+   fields.
 2. Invoke the authz interceptor with representative user and system-tenant
    inputs, then inspect `auth.Subject` inside the downstream handler.
 
 ##### Expected Results
 
-- `Subject.Tenant` contains the authenticated subject's tenant before the
-  handler runs.
+- `Subject.Tenant` and `Subject.Project` contain the principal's home scope
+  before the handler runs.
 - `Subject.Tenants` remains the visibility set and is not substituted for
   `Subject.Tenant`.
-- Marshal/unmarshal preserves `Tenant`; a legacy value without it decodes with
-  an empty `Tenant`.
+- Marshal/unmarshal preserves `Tenant` and `Project`; a legacy value without
+  them decodes with empty fields.
 - A subject belonging to the system tenant has `Tenant == auth.SystemTenant`.
 
 ##### Evidence
@@ -268,16 +284,17 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Provide JWT-user, service-account, system-tenant, guest/anonymous, and
-   unclassifiable identified subjects.
+1. Provide JWT-user, service-account, system-tenant user, system-tenant
+   service-account, guest/anonymous, and unclassifiable identified subjects.
 2. Invoke the actor callback for each request context.
 
 ##### Expected Results
 
-- JWT users map to USER and service accounts map to SERVICE_ACCOUNT, using the
-  subject's name.
-- `Subject.Tenant == auth.SystemTenant` maps to SYSTEM with no name, regardless
-  of authentication method or visible-tenant set.
+- JWT users map to the `user` branch and service accounts map to the
+  `service_account` branch.
+- Both branches carry the subject's name, home project, and tenant. A principal
+  in the system tenant retains its user/service-account branch and carries
+  `tenant=system`; the visibility set does not select the branch.
 - Guest/anonymous identity maps to no actor; an available but unclassifiable
   identity returns an error.
 
@@ -378,17 +395,19 @@ actor semantics are documented without changing the public Event contract.
 2. Exercise delete/archive and Signal using the same configured DAO/context
    path where applicable.
 3. Run EventPublisher and consume the resulting Kafka Events.
-4. Repeat with a service-account subject and a subject whose tenant is
-   `auth.SystemTenant`.
+4. Repeat with service-account subjects and with both principal kinds in the
+   system tenant.
 
 ##### Expected Results
 
-- The Kafka Event actor matches the `auth.Subject` attached to the request.
+- The Kafka Event contains the oneof branch and scoped reference derived from
+  the `auth.Subject` attached to the request.
 - Create, update, delete/archive, and Signal paths carry the same callback
   semantics wherever they emit object-change Events.
 - The database object mutation and actor-bearing outbox row commit or roll back
   together.
-- A SYSTEM actor has no name.
+- A system-tenant user and service account retain their respective reference
+  branches and carry `tenant=system`.
 
 ##### Evidence
 
@@ -473,6 +492,12 @@ actor semantics are documented without changing the public Event contract.
 
 ### Interface Change Coverage Gaps
 
+- Actor-reference cases depend on the shared tenant-scoped `UserReference`
+  contract in [OSAC-5424](https://redhat.atlassian.net/browse/OSAC-5424) and the
+  `ServiceAccountReference` contract from
+  [OSAC-6554](https://redhat.atlassian.net/browse/OSAC-6554). Run proto
+  generation and the mapped-reference tests after those shared contracts land;
+  this Feature does not add substitute reference messages.
 - Proto generation/lint are static validation, not a runtime boundary test.
   TC-PRDIS1-01 covers the private-to-public Event projection in the
   Kafka-backed Events server. Review generated public output after
