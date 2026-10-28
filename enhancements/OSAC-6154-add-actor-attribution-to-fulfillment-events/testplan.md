@@ -32,7 +32,8 @@ traceability labels for this testplan, not new PRD requirement IDs.
 | PRD-IS2, IC-3 | `auth.Subject.Tenant` and `Project` survive custom JSON serialization and are attached to request context, separate from the visible-tenant set. | Unit / [DEV] OSAC-Core | TC-PRDIS2-01 | Existing `fulfillment-service/internal/auth/auth_subject_test.go` and `grpc_authz_interceptor_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Auth subjects, tokens, and policy results are fixtures; no Keycloak, PostgreSQL, or Kafka. |
 | PRD-IS2, IC-1, IC-3 | Actor callback builds a user or service-account reference from authentication method and home scope; system tenant is a scope value, not a separate principal type. | Unit / [DEV] OSAC-Core | TC-PRDIS2-02 | Proposed `fulfillment-service/internal/cmd/service/start/grpcserver/actor_context_test.go`; from `fulfillment-service/`, `ginkgo run -r internal`. Contexts are fixtures; no Keycloak, PostgreSQL, or Kafka. |
 | PRD-IS2, IC-4 | Local-variable callback encodes values and returns errors before DML. | Unit / [DEV] OSAC-Core | TC-PRDIS2-03 | Proposed `fulfillment-service/internal/database/dao/generic_dao_local_variable_test.go`; `ginkgo run -r internal`. A transaction test double is used; no external services run for the case. |
-| PRD-IS2, PRD-IS3, IC-5 | Trigger persists actor JSONB, leaves it null when absent, and does not leak a local value across transactions. | Component integration (database) / [DEV] OSAC-Core | TC-PRDIS2-04, TC-PRDIS3-01 | Proposed `fulfillment-service/internal/database/migrations/136_add_actor_to_changes_test.go` (136 is the next migration number at this checkout); `ginkgo run -r internal` from `fulfillment-service/`. A real PostgreSQL test container runs; Kafka and Keycloak are omitted. |
+| PRD-IS2, IC-5 | Trigger persists actor JSONB and does not leak a local value across transactions. | Component integration (database) / [DEV] OSAC-Core | TC-PRDIS2-04 | Proposed `fulfillment-service/internal/database/migrations/136_add_actor_to_changes_test.go` (136 is the next migration number at this checkout); `ginkgo run -r internal` from `fulfillment-service/`. A real PostgreSQL test container runs; Kafka and Keycloak are omitted. |
+| PRD-IS3, IC-5, IC-6 | A missing actor stores SQL NULL while the valid object Event is still published. | Component integration / [DEV] OSAC-Core | TC-PRDIS3-01 | Existing `fulfillment-service/internal/servers/event_publisher_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. PostgreSQL and Kafka test containers are real; the callback returns no actor in the fixture. |
 | PRD-IS1, PRD-IS2, IC-3–IC-6 | Actor from a DAO mutation reaches the Kafka Event through the trigger and publisher. | Component integration / [DEV] OSAC-Core | TC-PRDIS2-05 | Proposed extension to `fulfillment-service/internal/servers/event_publisher_test.go`; `ginkgo run --timeout 10m internal/servers`. PostgreSQL and Kafka test containers are real; the auth subject is a fixture, not a live Keycloak request. |
 | PRD-IS1, PRD-IS2, IC-4–IC-6 | Specialized server/helper DAO write paths persist the request actor in their outbox rows. | Component integration / [DEV] OSAC-Core | TC-PRDIS2-06 | Proposed `fulfillment-service/internal/servers/event_actor_write_paths_test.go`; from `fulfillment-service/`, `ginkgo run --timeout 10m internal/servers`. PostgreSQL testcontainer is real; auth subject is fixture data, and Kafka is not needed to inspect the outbox. |
 
@@ -105,18 +106,23 @@ actor semantics are documented without changing the public Event contract.
 ##### Steps
 
 1. Use table-driven change rows for each registered object payload and actor
-   JSON containing the shared user or service-account reference in ordinary and
-   system tenant/project scopes.
-2. Include create, update, delete, and signal operations where applicable.
+   JSON containing shared user or service-account references in ordinary and
+   system tenant/project scopes. Example values are:
+   `{"user":{"name":"alice","project":"team-a","tenant":"tenant-a"}}`
+   and `{"service_account":{"name":"controller","project":"platform","tenant":"system"}}`.
+2. Include same-name service-account references with different project/tenant
+   scopes, and create, update, delete, and signal operations where applicable.
 3. Run EventPublisher, consume the Kafka Events, and inspect the selected
-   reference and its scope.
+   reference fields.
 
 ##### Expected Results
 
 - User Events select `actor.user`; service-account Events select
   `actor.service_account`.
-- Both references preserve the expected name, project, and tenant values from
-  the shared reference contract.
+- Protobuf paths `event.actor.user.{name,project,tenant}` and
+  `event.actor.service_account.{name,project,tenant}` contain the expected
+  values from the shared reference contract.
+- Same-name service accounts in different project/tenant scopes remain distinct.
 - A user in the system tenant remains a user reference; a system service
   account remains a service-account reference with tenant `system`.
 - Every supported object payload carries the same actor metadata; Event ID,
@@ -211,15 +217,17 @@ actor semantics are documented without changing the public Event contract.
 
 ##### Steps
 
-1. Seed a change row whose `actor` JSONB sets both oneof references and cannot
-   be decoded as `EventActor`, followed by a valid change row.
+1. Seed a change row with actor JSONB
+   `{"user":{"name":"alice","project":"team-a","tenant":"tenant-a"},"service_account":{"name":"controller","project":"platform","tenant":"system"}}`,
+   which sets both oneof branches, followed by a valid change row.
 2. Run EventPublisher and inspect Kafka, the outbox, and the error metric.
 
 ##### Expected Results
 
-- No Event is published for the malformed actor row; the publisher logs the
-  conversion error, increments `event_publish_errors_total`, and deletes that
-  row so draining continues.
+- `protojson.Unmarshal` rejects the conflicting oneof. No Event is published
+  for that row; the publisher logs `Failed to convert change` with the change
+  ID and decode error, increments `event_publish_errors_total` by one, deletes
+  the row, and continues draining.
 - The following valid change is published and removed from the outbox.
 
 ##### Evidence
@@ -487,6 +495,12 @@ actor semantics are documented without changing the public Event contract.
   `ginkgo run --timeout 10m internal/servers`.
 - **Real / faked:** PostgreSQL and Kafka test containers are real; missing actor
   context is a fixture.
+
+### PRD-IS4 — Fulfillment exposes attributed Events on its supported surfaces
+
+TC-PRDIS1-02 verifies that EventPublisher publishes the scoped actor reference
+to Kafka; TC-PRDIS1-03 verifies delivery through private Events Watch. Together
+they cover Fulfillment's private API and Kafka output for this requirement.
 
 ## Gaps
 
