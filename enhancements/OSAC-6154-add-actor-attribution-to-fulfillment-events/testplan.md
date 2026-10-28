@@ -360,6 +360,8 @@ actor semantics are documented without changing the public Event contract.
 
 - The actor-column migration and updated trigger are applied to an isolated
   test database.
+- Confirm migration number 136 is still the next free number before creating
+  the migration and corresponding test file.
 
 ##### Steps
 
@@ -380,8 +382,8 @@ actor semantics are documented without changing the public Event contract.
 
 - **Tier / owner:** Component integration (database) / [DEV] OSAC-Core.
 - **Suite:** Proposed `fulfillment-service/internal/database/migrations/136_add_actor_to_changes_test.go`;
-  136 is the next migration number at this checkout; verify the next free number
-  before implementation.
+  136 is the proposed number at this checkout; verify it remains free before
+  implementation.
 - **Command / working directory:** From `fulfillment-service/`, the documented
   `ginkgo run -r internal` command.
 - **Real / faked:** A real PostgreSQL test container runs the migration and
@@ -438,6 +440,8 @@ actor semantics are documented without changing the public Event contract.
 - The actor callback is configured on all supporting DAOs used by mutating
   server helpers.
 - The PostgreSQL test database has the actor-column migration applied.
+- All listed specialized write paths are required coverage because they write
+  object rows outside the single GenericServer DAO construction path.
 
 ##### Steps
 

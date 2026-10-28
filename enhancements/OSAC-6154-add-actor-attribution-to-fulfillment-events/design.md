@@ -420,6 +420,11 @@ is outside this Feature. [Codebase:
    references private, do not log them, and require a public projection to
    explicitly remove system-tenant references before any future exposure.
    Owner: OSAC-Core.
+6. **Shared reference dependency delay.** The actor oneof cannot be generated
+   until the shared reference contracts provide tenant scope. Mitigation: land
+   OSAC-5424 and the OSAC-6554 service-account reference contract before the
+   actor proto change; do not introduce temporary actor-only types. If either
+   dependency slips, the Dev Preview target moves with it. Owner: OSAC-Core.
 
 ### Drawbacks
 
@@ -544,6 +549,8 @@ The target is **Dev Preview (0.5)**. The Dev Preview exit criteria are:
   Watch path, while generated public Events remain actor-free.
 - Proto generation and lint pass, and `fulfillment-service/docs/API.md`
   documents the private actor contract.
+- The shared reference prerequisites (OSAC-5424 and OSAC-6554) are merged so
+  the EventActor oneof uses the canonical tenant-scoped contracts.
 
 Tech Preview and GA graduation criteria are outside this release's target.
 
