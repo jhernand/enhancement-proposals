@@ -5,7 +5,7 @@ authors:
 creation-date: 2026-10-27
 last-updated: 2026-10-28
 tracking-link:
-  - "https://redhat.atlassian.net/browse/OSAC-6856"
+  - "https://redhat.atlassian.net/browse/OSAC-6154"
 prd:
   - "prd.md"
 see-also:
@@ -594,6 +594,6 @@ existing PostgreSQL and Kafka test containers.
 ## Provenance
 
 Authored: respond @ design 0.12.0 - 7b2b8de, workspace feat/osac-6637-reader-role-access-docs @ 700534eab
-Phases: draft, revise, revise, revise, revise, revise, revise, respond
+Phases: draft, revise, revise, revise, revise, revise, revise, respond, respond
 
-<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"design","workflow_version":"0.12.0","ai_workflows":"7b2b8de","source_repo":"700534eab","source_repo_branch":"feat/osac-6637-reader-role-access-docs","commits_behind_main":0,"commits_ahead_main":1,"main_ref":"main","phases":["draft","revise","revise","revise","revise","revise","revise","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
+<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"design","workflow_version":"0.12.0","ai_workflows":"7b2b8de","source_repo":"700534eab","source_repo_branch":"feat/osac-6637-reader-role-access-docs","commits_behind_main":0,"commits_ahead_main":1,"main_ref":"main","phases":["draft","revise","revise","revise","revise","revise","revise","respond","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
