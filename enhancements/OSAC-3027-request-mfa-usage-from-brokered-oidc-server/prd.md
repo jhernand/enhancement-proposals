@@ -21,11 +21,12 @@ responsible for deciding whether MFA is performed.
 
 - The MFA request is a single deployment-wide policy for every brokered OIDC
   sign-in when enabled; it is not configurable per tenant. [Clarify: R1.Q1]
-- A Cloud Infrastructure Admin can configure the setting during installation
-  through the Enclave Wizard and can change it after installation. New
-  installations default to disabled; existing installations retain their
-  current sign-in behavior until the Admin enables it. [Clarify: R2.Q1,
-  R2.Q2, R2.Q3, R3.Q2, R3.Q3]
+- The Enclave Wizard provides a control in the OSAC setup flow for a Cloud
+  Infrastructure Admin to enable or disable the setting during installation;
+  the setting can also be changed after installation. New installations
+  default to disabled; existing installations retain their current sign-in
+  behavior until the Admin enables it. [Clarify: R2.Q1, R2.Q2, R2.Q3, R3.Q2,
+  R3.Q3] [User]
 - When enabled, OSAC requests generic MFA from the tenant-managed identity
   provider without specifying a particular method or assurance level. If the
   provider does not apply MFA, sign-in follows that provider's own policy. When
@@ -60,9 +61,9 @@ responsible for deciding whether MFA is performed.
 ### Cloud Infrastructure Admin
 
 - As a Cloud Infrastructure Admin, I want to enable or disable the global MFA
-  request during installation and change it later, so that I control whether
-  OSAC requests MFA during brokered sign-in. [Clarify: R2.Q1, R2.Q2, R2.Q3,
-  R3.Q1]
+  request through a control in the Enclave Wizard during installation and
+  change it later, so that I control whether OSAC requests MFA during brokered
+  sign-in. [Clarify: R2.Q1, R2.Q2, R2.Q3, R3.Q1] [User]
 - As a Cloud Infrastructure Admin, I want to verify during a brokered OIDC
   sign-in that OSAC sends the request, so that I can validate the
   authentication setup. [Jira: OSAC-3027]
@@ -82,8 +83,9 @@ responsible for deciding whether MFA is performed.
 
 ## Dependencies
 
-- **Enclave Wizard:** The installation flow must surface the global setting for
-  the Cloud Infrastructure Admin. [Clarify: R2.Q2]
+- **Enclave Wizard UI:** UI work is required to expose the global setting as a
+  control in OSAC setup for the Cloud Infrastructure Admin. [Clarify: R2.Q2]
+  [User]
 - [**OSAC-3024 — Red Hat Sovereign Enclave Integration**](https://redhat.atlassian.net/browse/OSAC-3024):
   Jira links OSAC-3027 as depending on this Feature.
 - [**OSAC-4387 — Token Lifecycle Hardening**](https://redhat.atlassian.net/browse/OSAC-4387):
@@ -97,7 +99,7 @@ responsible for deciding whether MFA is performed.
 
 ## Provenance
 
-Authored: revise @ prd 0.11.5 - 7b2b8de, workspace main @ 6f3f72851
-Phases: draft, revise
+Authored: respond @ prd 0.11.5 - 7b2b8de, workspace main @ 6f3f72851
+Phases: draft, revise, respond
 
-<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
+<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
