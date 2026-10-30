@@ -2,7 +2,7 @@
 
 ## Status
 
-- Rounds completed: 3
+- Rounds completed: 4
 - Open gaps: 0
 - Exit criteria met: Yes
 
@@ -271,7 +271,37 @@ Infrastructure Admin explicitly enables the setting.
 
 ---
 
+## Round 4 — Per-tenant MFA request setting
+
+### R4.Q1: Revised scope after review
+
+After review, should MFA request behavior remain deployment-wide, or should
+each tenant have its own setting? Which admins may change it, and what default
+preserves existing sign-in behavior?
+
+#### Answer
+
+The setting is per tenant and is disabled by default for backward compatibility.
+Cloud Provider Admins and Tenant Admins can change it within their tenant
+administration scope. It is part of Tenant configuration; there is no
+deployment-wide chart setting or Enclave Wizard change.
+
+#### Impact
+
+The PRD now describes per-tenant configuration and defaults, with no
+installation-time global control or Wizard work.
+
+#### Decision (D12)
+
+The MFA request setting is disabled by default for each tenant. Cloud Provider
+Admins can change it for tenants they administer; Tenant Admins can change it
+for their own tenant. Existing tenants preserve current sign-in behavior until
+the setting is enabled. This supersedes D1, D4, D6, and D7, and applies the
+disabled-default decisions D10 and D11 per tenant rather than deployment-wide.
+
+---
+
 ## Remaining Gaps
 
 None for PRD drafting. The protocol-specific request value and operational
-details for applying post-install changes are design decisions.
+details for applying tenant-level changes are design decisions.

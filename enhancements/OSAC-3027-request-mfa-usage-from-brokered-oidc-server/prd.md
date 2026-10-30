@@ -10,31 +10,29 @@
 ## Problem Statement
 
 Today, OSAC sign-in through a tenant-managed OpenID Connect (OIDC) server does
-not request multifactor authentication (MFA). Cloud Infrastructure Admins
-cannot enable a deployment-wide MFA request, and Tenant Admins lack guidance
-on when OSAC will request MFA so they can configure their identity provider.
-Without an MFA-specific request from OSAC, a tenant-managed identity provider
-has no OSAC signal to use when applying its own MFA policy; it remains
-responsible for deciding whether MFA is performed.
+not request multifactor authentication (MFA). Cloud Provider Admins and Tenant
+Admins cannot choose separately for each tenant whether OSAC should request
+MFA. Without that choice, a tenant-managed identity provider has no OSAC signal
+to use when applying its own MFA policy; it remains responsible for deciding
+whether MFA is performed. [User]
 
 ## In Scope
 
-- The MFA request is a single deployment-wide policy for every brokered OIDC
-  sign-in when enabled; it is not configurable per tenant. [Clarify: R1.Q1]
-- The Enclave Wizard provides a control in the OSAC setup flow for a Cloud
-  Infrastructure Admin to enable or disable the setting during installation;
-  the setting can also be changed after installation. New installations
-  default to disabled; existing installations retain their current sign-in
-  behavior until the Admin enables it. [Clarify: R2.Q1, R2.Q2, R2.Q3, R3.Q2,
-  R3.Q3] [User]
+- The MFA request setting is configured separately for each tenant and applies
+  to that tenant's brokered OIDC sign-ins when enabled. [User]
+- A Cloud Provider Admin can change the setting for each tenant; a Tenant Admin
+  can change it for their own tenant. The setting defaults to disabled for
+  backward compatibility, so existing sign-in behavior is preserved until it
+  is enabled. [User]
 - When enabled, OSAC requests generic MFA from the tenant-managed identity
   provider without specifying a particular method or assurance level. If the
   provider does not apply MFA, sign-in follows that provider's own policy. When
   disabled, OSAC sends no MFA request and brokered sign-in behavior remains
-  unchanged. [Clarify: R1.Q2, R1.Q3, R3.Q1]
-- Tenant Admin guidance explains when OSAC sends the request and that the
-  tenant-managed identity provider decides whether MFA is performed. OSAC does
-  not guarantee or enforce MFA. [Jira: OSAC-3027] [Clarify: R1.Q3, R1.Q5]
+  unchanged. [Clarify: R1.Q2, R1.Q3, R3.Q1] [User]
+- Tenant Admin guidance explains when OSAC sends the request for their tenant
+  and that the tenant-managed identity provider decides whether MFA is
+  performed. OSAC does not guarantee or enforce MFA. [Jira: OSAC-3027]
+  [Clarify: R1.Q3, R1.Q5] [User]
 - A Cloud Infrastructure Admin can verify during a brokered OIDC sign-in that
   OSAC sends the MFA request; per-sign-in evidence is not required. [Jira:
   OSAC-3027] [Clarify: R1.Q5]
@@ -43,33 +41,31 @@ responsible for deciding whether MFA is performed.
 
 - Platform-enforced MFA, including blocking sign-in when the identity provider
   does not apply MFA.
-- Changes to MFA policy on tenant-managed identity providers, and
-  tenant-specific request settings.
+- Changes to MFA policy on tenant-managed identity providers.
+- A single deployment-wide MFA setting; the request preference is managed
+  separately for each tenant. [User]
 - Per-sign-in evidence or reporting that claims MFA was performed.
-- Separate MFA configuration controls in the OSAC console or CLI; the
-  installation-time Enclave Wizard control is in scope.
 - Automatic session logoff and configurable session timeouts.
 
 ## User Stories
 
 ### Cloud Provider Admin
 
-- As a Cloud Provider Admin, I want OSAC to request generic MFA from all
-  brokered identity providers when the deployment setting is enabled, so that
-  an identity provider can apply its MFA policy. [Clarify: R1.Q1, R1.Q2]
+- As a Cloud Provider Admin, I want to change the MFA request preference for
+  each tenant I administer, so that I can control whether its brokered sign-ins
+  ask its identity provider to apply its MFA policy. [User]
 
 ### Cloud Infrastructure Admin
 
-- As a Cloud Infrastructure Admin, I want to enable or disable the global MFA
-  request through a control in the Enclave Wizard during installation and
-  change it later, so that I control whether OSAC requests MFA during brokered
-  sign-in. [Clarify: R2.Q1, R2.Q2, R2.Q3, R3.Q1] [User]
-- As a Cloud Infrastructure Admin, I want to verify during a brokered OIDC
-  sign-in that OSAC sends the request, so that I can validate the
-  authentication setup. [Jira: OSAC-3027]
+- As a Cloud Infrastructure Admin, I want to verify during a tenant's brokered
+  OIDC sign-in that OSAC sends the MFA request when that tenant's setting is
+  enabled, so that I can validate the authentication setup. [Jira: OSAC-3027]
 
 ### Tenant Admin
 
+- As a Tenant Admin, I want to change the MFA request preference for my tenant,
+  so that I can choose whether OSAC requests generic MFA during my tenant's
+  brokered sign-ins. [User]
 - As a Tenant Admin, I want guidance on when OSAC requests MFA and what my
   identity provider decides, so that I can configure my tenant-managed
   provider accordingly. [Jira: OSAC-3027] [Clarify: R1.Q3, R1.Q5]
@@ -83,9 +79,6 @@ responsible for deciding whether MFA is performed.
 
 ## Dependencies
 
-- **Enclave Wizard UI:** UI work is required to expose the global setting as a
-  control in OSAC setup for the Cloud Infrastructure Admin. [Clarify: R2.Q2]
-  [User]
 - [**OSAC-3024 — Red Hat Sovereign Enclave Integration**](https://redhat.atlassian.net/browse/OSAC-3024):
   Jira links OSAC-3027 as depending on this Feature.
 - [**OSAC-4387 — Token Lifecycle Hardening**](https://redhat.atlassian.net/browse/OSAC-4387):
@@ -100,6 +93,6 @@ responsible for deciding whether MFA is performed.
 ## Provenance
 
 Authored: respond @ prd 0.11.5 - 7b2b8de, workspace main @ 6f3f72851
-Phases: draft, revise, respond
+Phases: draft, revise, respond, respond
 
-<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
+<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise","respond","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
