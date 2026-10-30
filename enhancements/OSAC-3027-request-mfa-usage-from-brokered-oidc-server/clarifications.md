@@ -2,7 +2,7 @@
 
 ## Status
 
-- Rounds completed: 4
+- Rounds completed: 5
 - Open gaps: 0
 - Exit criteria met: Yes
 
@@ -298,6 +298,31 @@ Admins can change it for tenants they administer; Tenant Admins can change it
 for their own tenant. Existing tenants preserve current sign-in behavior until
 the setting is enabled. This supersedes D1, D4, D6, and D7, and applies the
 disabled-default decisions D10 and D11 per tenant rather than deployment-wide.
+
+---
+
+## Round 5 — OSAC console support
+
+### R5.Q1: Admin UI for tenant setting
+
+Should Cloud Provider Admins and Tenant Admins be able to change the
+per-tenant MFA request setting in the tracked OSAC console, or is API/CLI-only
+management sufficient?
+
+#### Answer
+
+Include OSAC console support for both Admin personas.
+
+#### Impact
+
+The PRD includes user-facing configuration in the OSAC console, and the
+bootstrap epic needs UX Design and UI Design gate tasks.
+
+#### Decision (D13)
+
+The OSAC console must let Cloud Provider Admins change the setting per tenant
+and Tenant Admins change it for their own tenant. Enclave Wizard work remains
+out of scope.
 
 ---
 

@@ -20,10 +20,10 @@ whether MFA is performed. [User]
 
 - The MFA request setting is configured separately for each tenant and applies
   to that tenant's brokered OIDC sign-ins when enabled. [User]
-- A Cloud Provider Admin can change the setting for each tenant; a Tenant Admin
-  can change it for their own tenant. The setting defaults to disabled for
-  backward compatibility, so existing sign-in behavior is preserved until it
-  is enabled. [User]
+- The OSAC console lets a Cloud Provider Admin change the setting for each
+  tenant and a Tenant Admin change it for their own tenant. The setting
+  defaults to disabled for backward compatibility, so existing sign-in
+  behavior is preserved until it is enabled. [User] [Clarify: R5.Q1]
 - When enabled, OSAC requests generic MFA from the tenant-managed identity
   provider without specifying a particular method or assurance level. If the
   provider does not apply MFA, sign-in follows that provider's own policy. When
@@ -52,8 +52,9 @@ whether MFA is performed. [User]
 ### Cloud Provider Admin
 
 - As a Cloud Provider Admin, I want to change the MFA request preference for
-  each tenant I administer, so that I can control whether its brokered sign-ins
-  ask its identity provider to apply its MFA policy. [User]
+  each tenant I administer in the OSAC console, so that I can control whether
+  its brokered sign-ins ask its identity provider to apply its MFA policy.
+  [User] [Clarify: R5.Q1]
 
 ### Cloud Infrastructure Admin
 
@@ -63,9 +64,9 @@ whether MFA is performed. [User]
 
 ### Tenant Admin
 
-- As a Tenant Admin, I want to change the MFA request preference for my tenant,
-  so that I can choose whether OSAC requests generic MFA during my tenant's
-  brokered sign-ins. [User]
+- As a Tenant Admin, I want to change the MFA request preference for my tenant
+  in the OSAC console, so that I can choose whether OSAC requests generic MFA
+  during my tenant's brokered sign-ins. [User] [Clarify: R5.Q1]
 - As a Tenant Admin, I want guidance on when OSAC requests MFA and what my
   identity provider decides, so that I can configure my tenant-managed
   provider accordingly. [Jira: OSAC-3027] [Clarify: R1.Q3, R1.Q5]
@@ -79,6 +80,8 @@ whether MFA is performed. [User]
 
 ## Dependencies
 
+- **OSAC UI:** The tenant-management workflow must expose the per-tenant setting
+  to Cloud Provider Admins and Tenant Admins. [User] [Clarify: R5.Q1]
 - [**OSAC-3024 — Red Hat Sovereign Enclave Integration**](https://redhat.atlassian.net/browse/OSAC-3024):
   Jira links OSAC-3027 as depending on this Feature.
 - [**OSAC-4387 — Token Lifecycle Hardening**](https://redhat.atlassian.net/browse/OSAC-4387):
@@ -93,6 +96,6 @@ whether MFA is performed. [User]
 ## Provenance
 
 Authored: respond @ prd 0.11.5 - 7b2b8de, workspace main @ 6f3f72851
-Phases: draft, revise, respond, respond
+Phases: draft, revise, respond, respond, respond, respond
 
-<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise","respond","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
+<!-- ai-workflow-provenance:{"schema_version":1,"provenance_kind":"session","workflow":"prd","workflow_version":"0.11.5","ai_workflows":"7b2b8de","source_repo":"6f3f72851","source_repo_branch":"main","commits_behind_main":0,"commits_ahead_main":0,"main_ref":"main","phases":["draft","revise","respond","respond","respond","respond"],"authoring_modes":["skill"],"context_changed":false,"origin_untracked":false} -->
